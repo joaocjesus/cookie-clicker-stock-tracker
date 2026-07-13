@@ -10,6 +10,10 @@ const highlightThresholdInput = document.querySelector("#highlight-threshold");
 const chart = document.querySelector("#history-chart");
 const chartLegend = document.querySelector("#chart-legend");
 const chartTooltip = document.querySelector("#chart-tooltip");
+const chartOlderButton = document.querySelector("#chart-older");
+const chartNewerButton = document.querySelector("#chart-newer");
+const chartLatestButton = document.querySelector("#chart-latest");
+const chartWindowLabel = document.querySelector("#chart-window-label");
 const purchaseCostDialog = document.querySelector("#purchase-cost-dialog");
 const purchaseCostForm = document.querySelector("#purchase-cost-form");
 const purchaseCostDescription = document.querySelector("#purchase-cost-description");
@@ -21,6 +25,9 @@ const sourceStorageKey = "cookie-market.source-path";
 const autoRefreshStorageKey = "cookie-market.auto-refresh";
 const purchaseCostsStorageKey = "cookie-market.purchase-costs";
 const highlightThresholdStorageKey = "cookie-market.highlight-threshold";
+const chartSelectedGoodsStorageKey = "cookie-market.chart-selected-goods";
+const chartPointLimit = 50;
+const chartNavigationStep = 35;
 const marketModes = [
     { icon: "↔", label: "Stable" },
     { icon: "↗", label: "Slow rise" },
@@ -34,9 +41,10 @@ const chartColors = [
     "#f9e2af", "#94e2d5", "#f5c2e7", "#fab387", "#a6e3a1",
 ];
 let snapshots = [];
-let selectedGoodIds = new Set([0]);
+let selectedGoodIds = loadSelectedGoodIds();
 let chartGeometry = null;
 let highlightedGoodId = null;
+let chartOffset = 0;
 let refreshTimer;
 let purchaseCosts = loadPurchaseCosts();
 let editedPurchaseCostGood = null;
@@ -54,6 +62,19 @@ function loadPurchaseCosts() {
     } catch {
         return {};
     }
+}
+
+function loadSelectedGoodIds() {
+    try {
+        const storedIds = JSON.parse(localStorage.getItem(chartSelectedGoodsStorageKey) || "[0]");
+        return new Set(storedIds.filter((goodId) => Number.isInteger(goodId) && goodId >= 0));
+    } catch {
+        return new Set([0]);
+    }
+}
+
+function saveSelectedGoodIds() {
+    localStorage.setItem(chartSelectedGoodsStorageKey, JSON.stringify([...selectedGoodIds]));
 }
 
 function purchaseCostFor(goodId) {
@@ -102,12 +123,43 @@ async function request(url, options = {}) {
 
 async function loadHistory() {
     const body = await request("/api/history");
+    const previousSnapshotCount = snapshots.length;
     snapshots = body.snapshots;
+    if (chartOffset) chartOffset += Math.max(0, snapshots.length - previousSnapshotCount);
+    chartOffset = Math.min(chartOffset, maxChartOffset());
     render();
 }
 
 function latestSnapshot() {
     return snapshots.at(-1);
+}
+
+function maxChartOffset() {
+    return Math.max(0, snapshots.length - chartPointLimit);
+}
+
+function displayedSnapshots() {
+    const end = Math.max(1, snapshots.length - chartOffset);
+    return snapshots.slice(Math.max(0, end - chartPointLimit), end);
+}
+
+function updateChartNavigation(chartSnapshots) {
+    const end = snapshots.length - chartOffset;
+    const start = end - chartSnapshots.length;
+    chartWindowLabel.textContent = `${start + 1}–${end} of ${snapshots.length}`;
+    chartWindowLabel.title = chartSnapshots.length
+        ? `${formatTime(chartSnapshots[0].captured_at)} – ${formatTime(chartSnapshots.at(-1).captured_at)}`
+        : "No snapshots to display";
+    chartOlderButton.disabled = chartOffset >= maxChartOffset();
+    chartNewerButton.disabled = chartOffset === 0;
+    chartLatestButton.disabled = chartOffset === 0;
+}
+
+function moveChartWindow(direction) {
+    chartOffset = direction === "older"
+        ? Math.min(maxChartOffset(), chartOffset + chartNavigationStep)
+        : Math.max(0, chartOffset - chartNavigationStep);
+    renderChart();
 }
 
 function formatTime(value) {
@@ -137,6 +189,7 @@ function render() {
 
     const visibleIds = new Set(visiblePrices.map((price) => price.good_id));
     selectedGoodIds = new Set([...selectedGoodIds].filter((goodId) => visibleIds.has(goodId)));
+    saveSelectedGoodIds();
     renderTable(visiblePrices);
     renderChart();
     setStatus(`Showing ${snapshots.length} imported ${snapshots.length === 1 ? "snapshot" : "snapshots"}.`, "success");
@@ -220,19 +273,20 @@ function toggleGood(goodId) {
     } else {
         selectedGoodIds.add(goodId);
     }
+    saveSelectedGoodIds();
     const visiblePrices = latestSnapshot().prices.filter((price) => price.unlocked);
     renderTable(visiblePrices);
     renderChart();
 }
 
-function seriesForGood(goodId) {
+function seriesForGood(goodId, chartSnapshots) {
     const good = latestSnapshot().prices.find((price) => price.good_id === goodId);
     return {
         goodId,
         name: good.name,
         color: colorForGood(goodId),
         currentPrice: good.price,
-        points: snapshots.map((snapshot, snapshotIndex) => ({
+        points: chartSnapshots.map((snapshot, snapshotIndex) => ({
             snapshotIndex,
             time: new Date(snapshot.captured_at),
             price: snapshot.prices.find((price) => price.good_id === goodId)?.price,
@@ -241,9 +295,11 @@ function seriesForGood(goodId) {
 }
 
 function renderChart() {
+    const chartSnapshots = displayedSnapshots();
+    updateChartNavigation(chartSnapshots);
     const allSeries = latestSnapshot().prices
         .filter((price) => price.unlocked)
-        .map((price) => seriesForGood(price.good_id));
+        .map((price) => seriesForGood(price.good_id, chartSnapshots));
     const series = allSeries.filter((item) => selectedGoodIds.has(item.goodId));
     highlightedGoodId = null;
     chartLegend.replaceChildren(...allSeries.map((item) => {
@@ -266,12 +322,12 @@ function renderChart() {
             if (!selectedGoodIds.has(item.goodId)) return;
             highlightedGoodId = item.goodId;
             legend.classList.add("highlighted");
-            drawChart(series);
+            drawChart(series, chartSnapshots);
         };
         const clearHighlight = () => {
             highlightedGoodId = null;
             legend.classList.remove("highlighted");
-            drawChart(series);
+            drawChart(series, chartSnapshots);
         };
         legend.addEventListener("mouseenter", highlight);
         legend.addEventListener("mouseleave", clearHighlight);
@@ -287,10 +343,10 @@ function renderChart() {
     }
     const pointCount = Math.max(...series.map((item) => item.points.length));
     document.querySelector("#chart-caption").textContent = pointCount > 1
-        ? `${pointCount} imported values. Click a good above to show or hide its line; hover a shown item to highlight it.`
+        ? `Showing ${pointCount} of ${snapshots.length} imported values. Click a good above to show or hide its line; hover a shown item to highlight it.`
         : "Import more changed saves to build this price history.";
 
-    drawChart(series);
+    drawChart(series, chartSnapshots);
 }
 
 function drawEmptyChart() {
@@ -311,7 +367,7 @@ function drawEmptyChart() {
     chartTooltip.hidden = true;
 }
 
-function drawChart(series) {
+function drawChart(series, chartSnapshots) {
     const scale = window.devicePixelRatio || 1;
     const width = chart.clientWidth;
     const height = chart.clientHeight;
@@ -330,7 +386,7 @@ function drawChart(series) {
     const spread = high - low || Math.max(high * 0.08, 1);
     const lower = Math.max(0, low - spread * 0.18);
     const upper = high + spread * 0.18;
-    const x = (snapshotIndex) => padding.left + (snapshots.length === 1 ? usableWidth / 2 : snapshotIndex * usableWidth / (snapshots.length - 1));
+    const x = (snapshotIndex) => padding.left + (chartSnapshots.length === 1 ? usableWidth / 2 : snapshotIndex * usableWidth / (chartSnapshots.length - 1));
     const y = (value) => padding.top + (upper - value) * usableHeight / (upper - lower);
 
     context.strokeStyle = "rgba(185, 170, 145, .22)";
@@ -355,20 +411,20 @@ function drawChart(series) {
             ? context.lineTo(x(point.snapshotIndex), y(point.price))
             : context.moveTo(x(point.snapshotIndex), y(point.price)));
         context.strokeStyle = item.color;
-        context.lineWidth = highlighted ? 4 : 2;
+        context.lineWidth = highlighted ? 2 : 1.5;
         context.shadowColor = highlighted ? item.color : "transparent";
         context.shadowBlur = highlighted ? 8 : 0;
         context.stroke();
         item.points.forEach((point) => {
             context.beginPath();
-            context.arc(x(point.snapshotIndex), y(point.price), highlighted ? 4 : 3, 0, Math.PI * 2);
+            context.arc(x(point.snapshotIndex), y(point.price), highlighted ? 2.5 : 2, 0, Math.PI * 2);
             context.fillStyle = item.color;
             context.fill();
         });
         context.restore();
     });
-    const start = new Date(snapshots[0].captured_at).toLocaleDateString();
-    const end = new Date(snapshots.at(-1).captured_at).toLocaleDateString();
+    const start = new Date(chartSnapshots[0].captured_at).toLocaleDateString();
+    const end = new Date(chartSnapshots.at(-1).captured_at).toLocaleDateString();
     context.fillStyle = "#b9aa91";
     context.fillText(start, padding.left, height - 11);
     context.textAlign = "right"; context.fillText(end, width - padding.right, height - 11); context.textAlign = "left";
@@ -483,6 +539,12 @@ purchaseCostForm.addEventListener("submit", (event) => {
 purchaseCostInput.addEventListener("input", () => purchaseCostInput.setCustomValidity(""));
 removePurchaseCostButton.addEventListener("click", removePurchaseCost);
 cancelPurchaseCostButton.addEventListener("click", () => purchaseCostDialog.close());
+chartOlderButton.addEventListener("click", () => moveChartWindow("older"));
+chartNewerButton.addEventListener("click", () => moveChartWindow("newer"));
+chartLatestButton.addEventListener("click", () => {
+    chartOffset = 0;
+    renderChart();
+});
 chart.addEventListener("mousemove", showChartTooltip);
 chart.addEventListener("mouseleave", () => { chartTooltip.hidden = true; });
 window.addEventListener("resize", () => snapshots.length && renderChart());

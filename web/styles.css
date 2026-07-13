@@ -87,6 +87,30 @@ h2 {
     gap: 14px;
 }
 
+.chart-navigation {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.chart-navigation .button {
+    padding: 6px 9px;
+    font-size: .75rem;
+}
+
+.chart-window-label {
+    min-width: 88px;
+    color: var(--muted);
+    font-size: .76rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.chart-navigation .button:disabled {
+    cursor: default;
+    opacity: .4;
+}
+
 .highlight-threshold {
     display: inline-flex;
     align-items: center;
