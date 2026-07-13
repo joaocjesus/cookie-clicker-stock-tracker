@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+archives/
+save.txt
+market.sqlite3
+current_market.json
+market_prices.csv

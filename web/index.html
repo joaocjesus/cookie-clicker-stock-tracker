@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cookie Market Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+    <main>
+        <header class="hero">
+            <p class="eyebrow">COOKIE CLICKER • BANK MINIGAME</p>
+            <div class="hero-title">
+                <div>
+                    <h1>Market Monitor</h1>
+                    <p class="subtitle">Import a Steam save, then follow every good’s price over time.</p>
+                </div>
+                <div id="status" class="status" data-tone="neutral">Loading history…</div>
+            </div>
+        </header>
+
+        <section class="import-panel" aria-labelledby="import-title">
+            <div>
+                <p class="eyebrow">UPDATE DATA</p>
+                <h2 id="import-title">Import a save</h2>
+                <p class="muted">The selected Steam path stays in this browser’s local storage. The app only reads it.
+                </p>
+            </div>
+            <div class="import-controls">
+                <label class="path-field" for="source-path">
+                    <span>Windows Steam save location</span>
+                    <input id="source-path" type="text" spellcheck="false"
+                        placeholder="C:\Program Files (x86)\Steam\userdata\…\1454400\remote\save.txt" />
+                </label>
+                <div class="button-row">
+                    <button id="import-path" class="button primary">Read saved location</button>
+                    <label class="button secondary" for="save-upload">Upload save.txt<input id="save-upload" type="file"
+                            accept=".txt,text/plain" hidden /></label>
+                </div>
+                <label class="refresh-toggle"><input id="auto-refresh" type="checkbox" /> Refresh this path every
+                    minute</label>
+            </div>
+        </section>
+
+        <section id="empty-state" class="empty-state" hidden>
+            <div class="cookie">🍪</div>
+            <h2>No market snapshots yet</h2>
+            <p>Choose the live Steam <code>save.txt</code> location or upload a copied save to add the first snapshot.
+            </p>
+        </section>
+
+        <div id="market-content" hidden>
+            <section class="summary-grid" aria-label="Latest market summary">
+                <article><span>Latest save</span><strong id="latest-time">—</strong></article>
+                <article><span>Goods unlocked</span><strong id="good-count">—</strong></article>
+                <article><span>Snapshots</span><strong id="snapshot-count">—</strong></article>
+                <article><span>Game version</span><strong id="game-version">—</strong></article>
+            </section>
+
+            <section class="goods-panel" aria-labelledby="goods-title">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">LATEST PRICES</p>
+                        <h2 id="goods-title">Unlocked goods</h2>
+                    </div>
+                    <p class="muted">Select rows to compare them.</p>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Good</th>
+                                <th>Price</th>
+                                <th title="Lowest price observed by this tool">Low</th>
+                                <th title="Highest price observed by this tool">High</th>
+                                <th>Trend</th>
+                                <th>Owned</th>
+                                <th>Mode</th>
+                            </tr>
+                        </thead>
+                        <tbody id="goods-table"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="chart-panel" aria-labelledby="chart-title">
+                <div class="panel-heading">
+                    <div>
+                        <p class="eyebrow">PRICE HISTORY</p>
+                        <h2 id="chart-title">Price movement</h2>
+                    </div>
+                    <div class="good-picker">
+                        <span>Goods</span>
+                        <details id="good-picker-menu">
+                            <summary id="good-picker-summary">1 selected</summary>
+                            <div id="good-options" class="good-options"></div>
+                        </details>
+                    </div>
+                </div>
+                <div id="chart-legend" class="chart-legend" aria-label="Selected goods"></div>
+                <div class="chart-wrap">
+                    <canvas id="history-chart" aria-label="Selected goods price history" role="img"></canvas>
+                    <div id="chart-tooltip" class="chart-tooltip" hidden></div>
+                </div>
+                <p id="chart-caption" class="chart-caption"></p>
+            </section>
+        </div>
+    </main>
+    <script src="app.js"></script>
+</body>
+
+</html>
