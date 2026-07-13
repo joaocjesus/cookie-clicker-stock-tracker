@@ -4,6 +4,10 @@ A dependency-free Python tool for the Steam version of Cookie Clicker. It reads
 the save without modifying it, extracts the Bank Stock Market's **current**
 prices, and stores a historical timeline in SQLite.
 
+<img width="2264" height="1342" alt="image" src="https://github.com/user-attachments/assets/647b7b5d-b654-4f40-bab3-a99ab3ad86ac" />
+<img width="2186" height="1220" alt="image" src="https://github.com/user-attachments/assets/db7011aa-55a9-43c6-a5f7-3b05bc89dcdd" />
+
+
 ## Why use it?
 
 The Stock Market only shows its current price in-game. This monitor records
