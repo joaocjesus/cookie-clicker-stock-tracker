@@ -87,3 +87,10 @@ For a single current-price JSON file, use:
 The parser is based on the current save fixture. If a future Cookie Clicker
 update changes the save layout, the tool stops with a format error instead of
 silently recording incorrect prices.
+
+## License
+
+Released under the [GNU General Public License v3.0](LICENSE). You may use,
+modify, and redistribute this software, including commercially, provided that
+distributed modified versions remain GPL-licensed and retain the copyright and
+license notices.
