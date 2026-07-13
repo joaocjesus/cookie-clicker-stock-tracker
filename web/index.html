@@ -65,7 +65,14 @@
                         <p class="eyebrow">LATEST PRICES</p>
                         <h2 id="goods-title">Unlocked goods</h2>
                     </div>
-                    <p class="muted">Select rows to compare them.</p>
+                    <div class="price-list-controls">
+                        <label class="highlight-threshold" for="highlight-threshold">
+                            <span>Highlight below $</span>
+                            <input id="highlight-threshold" type="number" min="0" step="0.01" inputmode="decimal"
+                                value="10" />
+                        </label>
+                        <p class="muted">Use the note button to record a purchase cost.</p>
+                    </div>
                 </div>
                 <div class="table-wrap">
                     <table>
@@ -91,15 +98,8 @@
                         <p class="eyebrow">PRICE HISTORY</p>
                         <h2 id="chart-title">Price movement</h2>
                     </div>
-                    <div class="good-picker">
-                        <span>Goods</span>
-                        <details id="good-picker-menu">
-                            <summary id="good-picker-summary">1 selected</summary>
-                            <div id="good-options" class="good-options"></div>
-                        </details>
-                    </div>
                 </div>
-                <div id="chart-legend" class="chart-legend" aria-label="Selected goods"></div>
+                <div id="chart-legend" class="chart-legend" aria-label="Goods to show on the chart"></div>
                 <div class="chart-wrap">
                     <canvas id="history-chart" aria-label="Selected goods price history" role="img"></canvas>
                     <div id="chart-tooltip" class="chart-tooltip" hidden></div>
@@ -108,6 +108,23 @@
             </section>
         </div>
     </main>
+
+    <dialog id="purchase-cost-dialog" class="purchase-cost-dialog" aria-label="Purchase cost">
+        <form id="purchase-cost-form" method="dialog">
+            <p class="eyebrow">PURCHASE NOTE</p>
+            <p id="purchase-cost-description" class="muted"></p>
+            <label class="cost-field" for="purchase-cost-input">
+                <span>Price paid</span>
+                <input id="purchase-cost-input" type="number" min="0.01" step="0.01" inputmode="decimal"
+                    placeholder="0.00" />
+            </label>
+            <div class="dialog-actions">
+                <button id="remove-purchase-cost" class="button secondary" type="button">Remove</button>
+                <button id="cancel-purchase-cost" class="button secondary" type="button">Cancel</button>
+                <button class="button primary" type="submit">Save cost</button>
+            </div>
+        </form>
+    </dialog>
     <script src="app.js"></script>
 </body>
 

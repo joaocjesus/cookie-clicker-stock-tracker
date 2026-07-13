@@ -80,6 +80,49 @@ h2 {
     margin-bottom: 0;
 }
 
+.price-list-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 14px;
+}
+
+.highlight-threshold {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--muted);
+    font-size: .78rem;
+    white-space: nowrap;
+}
+
+.highlight-threshold input {
+    width: 56px;
+    padding: 5px 6px;
+    color: var(--accent);
+    background: rgba(0, 0, 0, .18);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    font: inherit;
+    font-weight: 700;
+}
+
+.highlight-threshold input::-webkit-inner-spin-button,
+.highlight-threshold input::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
+}
+
+.highlight-threshold input {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.highlight-threshold input:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
 .status {
     border: 1px solid var(--line);
     background: rgba(35, 23, 15, .72);
@@ -226,64 +269,6 @@ select:focus {
     margin-bottom: 22px;
 }
 
-.good-picker {
-    display: flex;
-    align-items: center;
-    gap: 9px;
-    color: var(--muted);
-    font-size: .83rem;
-}
-
-.good-picker details {
-    position: relative;
-}
-
-.good-picker summary {
-    min-width: 180px;
-    padding: 8px 10px;
-    color: var(--ink);
-    background: #160e0a;
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    cursor: pointer;
-    list-style-position: inside;
-}
-
-.good-options {
-    position: absolute;
-    z-index: 20;
-    top: calc(100% + 6px);
-    right: 0;
-    display: grid;
-    min-width: 220px;
-    max-height: 300px;
-    padding: 7px;
-    overflow-y: auto;
-    color: var(--ink);
-    background: #160e0a;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, .45);
-}
-
-.good-option {
-    display: grid;
-    grid-template-columns: auto 10px 1fr;
-    align-items: center;
-    gap: 8px;
-    padding: 7px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.good-option:hover {
-    background: rgba(255, 199, 91, .1);
-}
-
-.good-option input {
-    accent-color: var(--accent);
-}
-
 .series-swatch {
     width: 9px;
     height: 9px;
@@ -303,9 +288,13 @@ select:focus {
     display: inline-flex;
     align-items: center;
     gap: 7px;
+    padding: 0;
     color: var(--muted);
+    background: none;
+    border: 0;
     font-size: .82rem;
-    cursor: default;
+    font-family: inherit;
+    cursor: pointer;
     transition: color .15s ease;
 }
 
@@ -313,11 +302,20 @@ select:focus {
     color: var(--ink);
 }
 
+.legend-item.is-hidden {
+    opacity: .42;
+}
+
+.legend-item.is-hidden strong {
+    color: inherit;
+}
+
 .legend-item:hover,
 .legend-item:focus-visible,
 .legend-item.highlighted {
     color: var(--ink);
-    outline: none;
+    outline: 1px solid var(--accent);
+    outline-offset: 3px;
 }
 
 .legend-item .series-swatch {
@@ -401,34 +399,109 @@ th {
 th:first-child,
 td:first-child {
     text-align: left;
-    width: 15%;
+    width: 20%;
+    white-space: nowrap;
 }
 
 tbody tr {
-    cursor: pointer;
     transition: background .15s;
 }
 
-tbody tr:hover,
-tbody tr.selected {
+tbody tr:hover {
     background: rgba(255, 199, 91, .1);
 }
 
-tbody tr.selected td:first-child {
-    box-shadow: inset 3px 0 var(--series-color);
-}
-
-tbody tr.price-under-ten {
+tbody tr.price-under-threshold {
     background: linear-gradient(90deg, rgba(255, 199, 91, .2), rgba(255, 199, 91, .04));
 }
 
-tbody tr.price-under-ten:hover {
+tbody tr.price-under-threshold:hover {
     background: linear-gradient(90deg, rgba(255, 199, 91, .28), rgba(255, 199, 91, .1));
 }
 
 .low-price {
     color: var(--accent);
     font-weight: 700;
+}
+
+tbody tr.price-above-cost {
+    background: linear-gradient(90deg, rgba(128, 210, 151, .18), rgba(128, 210, 151, .03));
+}
+
+tbody tr.price-above-cost:hover {
+    background: linear-gradient(90deg, rgba(128, 210, 151, .26), rgba(128, 210, 151, .08));
+}
+
+.purchase-cost-button {
+    flex: none;
+    margin-left: 7px;
+    padding: 2px 6px;
+    color: var(--muted);
+    background: rgba(0, 0, 0, .16);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    font: inherit;
+    font-size: .72rem;
+    line-height: 1.2;
+    cursor: pointer;
+}
+
+.purchase-cost-button:hover,
+.purchase-cost-button:focus-visible {
+    color: var(--ink);
+    border-color: var(--accent);
+    outline: none;
+}
+
+.purchase-cost-dialog {
+    width: min(360px, calc(100% - 32px));
+    padding: 24px;
+    color: var(--ink);
+    background: #23170f;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+}
+
+.purchase-cost-dialog::backdrop {
+    background: rgba(0, 0, 0, .62);
+}
+
+.purchase-cost-dialog h2 {
+    margin: 4px 0 8px;
+}
+
+.cost-field {
+    display: grid;
+    gap: 6px;
+    margin: 18px 0;
+    color: var(--muted);
+    font-size: .82rem;
+}
+
+.cost-field input {
+    width: 100%;
+    padding: 9px 10px;
+    color: var(--ink);
+    background: rgba(0, 0, 0, .2);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    font: inherit;
+}
+
+.cost-field input:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.dialog-actions #remove-purchase-cost {
+    margin-right: auto;
 }
 
 .positive {

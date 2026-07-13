@@ -5,15 +5,22 @@ const autoRefresh = document.querySelector("#auto-refresh");
 const status = document.querySelector("#status");
 const emptyState = document.querySelector("#empty-state");
 const marketContent = document.querySelector("#market-content");
-const goodPickerSummary = document.querySelector("#good-picker-summary");
-const goodOptions = document.querySelector("#good-options");
 const goodsTable = document.querySelector("#goods-table");
+const highlightThresholdInput = document.querySelector("#highlight-threshold");
 const chart = document.querySelector("#history-chart");
 const chartLegend = document.querySelector("#chart-legend");
 const chartTooltip = document.querySelector("#chart-tooltip");
+const purchaseCostDialog = document.querySelector("#purchase-cost-dialog");
+const purchaseCostForm = document.querySelector("#purchase-cost-form");
+const purchaseCostDescription = document.querySelector("#purchase-cost-description");
+const purchaseCostInput = document.querySelector("#purchase-cost-input");
+const removePurchaseCostButton = document.querySelector("#remove-purchase-cost");
+const cancelPurchaseCostButton = document.querySelector("#cancel-purchase-cost");
 
 const sourceStorageKey = "cookie-market.source-path";
 const autoRefreshStorageKey = "cookie-market.auto-refresh";
+const purchaseCostsStorageKey = "cookie-market.purchase-costs";
+const highlightThresholdStorageKey = "cookie-market.highlight-threshold";
 const marketModes = [
     { icon: "↔", label: "Stable" },
     { icon: "↗", label: "Slow rise" },
@@ -31,9 +38,55 @@ let selectedGoodIds = new Set([0]);
 let chartGeometry = null;
 let highlightedGoodId = null;
 let refreshTimer;
+let purchaseCosts = loadPurchaseCosts();
+let editedPurchaseCostGood = null;
 
 sourcePath.value = localStorage.getItem(sourceStorageKey) || "";
 autoRefresh.checked = localStorage.getItem(autoRefreshStorageKey) === "true";
+highlightThresholdInput.value = localStorage.getItem(highlightThresholdStorageKey) || "10";
+
+function loadPurchaseCosts() {
+    try {
+        const costs = JSON.parse(localStorage.getItem(purchaseCostsStorageKey) || "{}");
+        return Object.fromEntries(Object.entries(costs).filter(([, value]) =>
+            Number.isFinite(value) && value > 0
+        ));
+    } catch {
+        return {};
+    }
+}
+
+function purchaseCostFor(goodId) {
+    return purchaseCosts[goodId];
+}
+
+function highlightThreshold() {
+    const threshold = Number(highlightThresholdInput.value);
+    return Number.isFinite(threshold) && threshold >= 0 ? threshold : 10;
+}
+
+function editPurchaseCost(price) {
+    const existingCost = purchaseCostFor(price.good_id);
+    editedPurchaseCostGood = price;
+    purchaseCostDescription.textContent = `Record the price paid for ${price.name}.`;
+    purchaseCostInput.value = existingCost?.toFixed(2) || price.price.toFixed(2);
+    removePurchaseCostButton.hidden = !existingCost;
+    purchaseCostDialog.showModal();
+    purchaseCostInput.focus();
+}
+
+function savePurchaseCost(cost) {
+    purchaseCosts[editedPurchaseCostGood.good_id] = cost;
+    localStorage.setItem(purchaseCostsStorageKey, JSON.stringify(purchaseCosts));
+    renderTable(latestSnapshot().prices.filter((item) => item.unlocked));
+}
+
+function removePurchaseCost() {
+    delete purchaseCosts[editedPurchaseCostGood.good_id];
+    localStorage.setItem(purchaseCostsStorageKey, JSON.stringify(purchaseCosts));
+    purchaseCostDialog.close();
+    renderTable(latestSnapshot().prices.filter((item) => item.unlocked));
+}
 
 function setStatus(message, tone = "neutral") {
     status.textContent = message;
@@ -84,8 +137,6 @@ function render() {
 
     const visibleIds = new Set(visiblePrices.map((price) => price.good_id));
     selectedGoodIds = new Set([...selectedGoodIds].filter((goodId) => visibleIds.has(goodId)));
-    if (!selectedGoodIds.size) selectedGoodIds.add(visiblePrices[0].good_id);
-    renderGoodOptions(visiblePrices);
     renderTable(visiblePrices);
     renderChart();
     setStatus(`Showing ${snapshots.length} imported ${snapshots.length === 1 ? "snapshot" : "snapshots"}.`, "success");
@@ -95,31 +146,15 @@ function colorForGood(goodId) {
     return chartColors[goodId % chartColors.length];
 }
 
-function renderGoodOptions(prices) {
-    goodPickerSummary.textContent = `${selectedGoodIds.size} selected`;
-    goodOptions.replaceChildren(...prices.map((price) => {
-        const option = document.createElement("label");
-        option.className = "good-option";
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = selectedGoodIds.has(price.good_id);
-        checkbox.addEventListener("change", () => toggleGood(price.good_id));
-        const swatch = document.createElement("span");
-        swatch.className = "series-swatch";
-        swatch.style.setProperty("--series-color", colorForGood(price.good_id));
-        const name = document.createElement("span");
-        name.textContent = price.name;
-        option.append(checkbox, swatch, name);
-        return option;
-    }));
-}
-
 function renderTable(prices) {
+    const threshold = highlightThreshold();
     goodsTable.replaceChildren(...prices.map((price) => {
         const row = document.createElement("tr");
+        const purchaseCost = purchaseCostFor(price.good_id);
+        const isAboveCost = Number.isFinite(purchaseCost) && price.price > purchaseCost;
         row.className = [
-            selectedGoodIds.has(price.good_id) && "selected",
-            price.price < 10 && "price-under-ten",
+            price.price < threshold && "price-under-threshold",
+            isAboveCost && "price-above-cost",
         ].filter(Boolean).join(" ");
         row.style.setProperty("--series-color", colorForGood(price.good_id));
         const observedPrices = snapshots
@@ -136,13 +171,34 @@ function renderTable(prices) {
         values.forEach((value, index) => {
             const cell = document.createElement("td");
             cell.textContent = value;
-            if (index === 1 && price.price < 10) {
-                cell.className = "low-price";
-                cell.title = "Current price is below $10";
+            if (index === 1 && price.price < threshold) {
+                cell.classList.add("low-price");
+                cell.title = `Current price is below your $${threshold.toFixed(2)} highlight threshold`;
+            }
+            if (index === 1 && isAboveCost) {
+                cell.title = `Current price is above your $${purchaseCost.toFixed(2)} purchase cost`;
             }
             if (index === 4) cell.className = price.delta >= 0 ? "positive" : "negative";
             row.append(cell);
         });
+
+        const goodCell = row.firstElementChild;
+        goodCell.classList.add("good-cell");
+        const name = document.createElement("span");
+        name.textContent = price.name;
+        const costButton = document.createElement("button");
+        costButton.className = "purchase-cost-button";
+        costButton.type = "button";
+        costButton.textContent = purchaseCost ? `✎ $${purchaseCost.toFixed(2)}` : "✎";
+        costButton.title = purchaseCost
+            ? `Edit $${purchaseCost.toFixed(2)} purchase cost for ${price.name}`
+            : `Set purchase cost for ${price.name}`;
+        costButton.setAttribute("aria-label", costButton.title);
+        costButton.addEventListener("click", (event) => {
+            event.stopPropagation();
+            editPurchaseCost(price);
+        });
+        goodCell.replaceChildren(name, costButton);
 
         const mode = marketModes[price.mode] || { icon: "?", label: "Unknown mode" };
         const modeCell = document.createElement("td");
@@ -153,7 +209,6 @@ function renderTable(prices) {
         modeIcon.setAttribute("aria-label", mode.label);
         modeCell.append(modeIcon);
         row.append(modeCell);
-        row.addEventListener("click", () => toggleGood(price.good_id));
         return row;
     }));
 }
@@ -161,13 +216,11 @@ function renderTable(prices) {
 function toggleGood(goodId) {
     goodId = Number(goodId);
     if (selectedGoodIds.has(goodId)) {
-        if (selectedGoodIds.size === 1) return;
         selectedGoodIds.delete(goodId);
     } else {
         selectedGoodIds.add(goodId);
     }
     const visiblePrices = latestSnapshot().prices.filter((price) => price.unlocked);
-    renderGoodOptions(visiblePrices);
     renderTable(visiblePrices);
     renderChart();
 }
@@ -188,12 +241,18 @@ function seriesForGood(goodId) {
 }
 
 function renderChart() {
-    const series = [...selectedGoodIds].map(seriesForGood);
+    const allSeries = latestSnapshot().prices
+        .filter((price) => price.unlocked)
+        .map((price) => seriesForGood(price.good_id));
+    const series = allSeries.filter((item) => selectedGoodIds.has(item.goodId));
     highlightedGoodId = null;
-    chartLegend.replaceChildren(...series.map((item) => {
-        const legend = document.createElement("span");
-        legend.className = "legend-item";
-        legend.tabIndex = 0;
+    chartLegend.replaceChildren(...allSeries.map((item) => {
+        const isShown = selectedGoodIds.has(item.goodId);
+        const legend = document.createElement("button");
+        legend.className = `legend-item${isShown ? "" : " is-hidden"}`;
+        legend.type = "button";
+        legend.setAttribute("aria-pressed", String(isShown));
+        legend.title = `${isShown ? "Hide" : "Show"} ${item.name} on the chart`;
         const swatch = document.createElement("span");
         swatch.className = "series-swatch";
         swatch.style.setProperty("--series-color", item.color);
@@ -204,6 +263,7 @@ function renderChart() {
         label.append(price);
         legend.append(swatch, label);
         const highlight = () => {
+            if (!selectedGoodIds.has(item.goodId)) return;
             highlightedGoodId = item.goodId;
             legend.classList.add("highlighted");
             drawChart(series);
@@ -217,14 +277,38 @@ function renderChart() {
         legend.addEventListener("mouseleave", clearHighlight);
         legend.addEventListener("focus", highlight);
         legend.addEventListener("blur", clearHighlight);
+        legend.addEventListener("click", () => toggleGood(item.goodId));
         return legend;
     }));
+    if (!series.length) {
+        document.querySelector("#chart-caption").textContent = "Click a good above to show its price history.";
+        drawEmptyChart();
+        return;
+    }
     const pointCount = Math.max(...series.map((item) => item.points.length));
     document.querySelector("#chart-caption").textContent = pointCount > 1
-        ? `${pointCount} imported values. Hover a line to identify it. Lines connect saved snapshots, not game ticks.`
+        ? `${pointCount} imported values. Click a good above to show or hide its line; hover a shown item to highlight it.`
         : "Import more changed saves to build this price history.";
 
     drawChart(series);
+}
+
+function drawEmptyChart() {
+    const scale = window.devicePixelRatio || 1;
+    const width = chart.clientWidth;
+    const height = chart.clientHeight;
+    chart.width = Math.round(width * scale);
+    chart.height = Math.round(height * scale);
+    const context = chart.getContext("2d");
+    context.scale(scale, scale);
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = "#b9aa91";
+    context.font = "14px system-ui";
+    context.textAlign = "center";
+    context.fillText("No goods selected", width / 2, height / 2);
+    context.textAlign = "left";
+    chartGeometry = null;
+    chartTooltip.hidden = true;
 }
 
 function drawChart(series) {
@@ -377,6 +461,28 @@ function configureAutoRefresh() {
 importPathButton.addEventListener("click", importFromPath);
 uploadInput.addEventListener("change", importUpload);
 autoRefresh.addEventListener("change", configureAutoRefresh);
+highlightThresholdInput.addEventListener("change", () => {
+    if (!Number.isFinite(Number(highlightThresholdInput.value)) || Number(highlightThresholdInput.value) < 0) {
+        highlightThresholdInput.value = "10";
+    }
+    localStorage.setItem(highlightThresholdStorageKey, highlightThresholdInput.value);
+    if (snapshots.length) renderTable(latestSnapshot().prices.filter((price) => price.unlocked));
+});
+purchaseCostForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const cost = Number(purchaseCostInput.value);
+    if (!Number.isFinite(cost) || cost <= 0) {
+        purchaseCostInput.setCustomValidity("Enter a positive purchase price.");
+        purchaseCostInput.reportValidity();
+        return;
+    }
+    purchaseCostInput.setCustomValidity("");
+    savePurchaseCost(cost);
+    purchaseCostDialog.close();
+});
+purchaseCostInput.addEventListener("input", () => purchaseCostInput.setCustomValidity(""));
+removePurchaseCostButton.addEventListener("click", removePurchaseCost);
+cancelPurchaseCostButton.addEventListener("click", () => purchaseCostDialog.close());
 chart.addEventListener("mousemove", showChartTooltip);
 chart.addEventListener("mouseleave", () => { chartTooltip.hidden = true; });
 window.addEventListener("resize", () => snapshots.length && renderChart());
