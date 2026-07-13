@@ -1,96 +1,138 @@
 # Cookie Clicker Stock Market Monitor
 
-A dependency-free Python tool for the Steam version of Cookie Clicker. It reads
-the save without modifying it, extracts the Bank Stock Market's **current**
-prices, and stores a historical timeline in SQLite.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Python 3](https://img.shields.io/badge/Python-3.x-3776AB.svg?logo=python&logoColor=white)](https://www.python.org/)
 
-<img width="2264" height="1342" alt="image" src="https://github.com/user-attachments/assets/647b7b5d-b654-4f40-bab3-a99ab3ad86ac" />
-<img width="2186" height="1220" alt="image" src="https://github.com/user-attachments/assets/db7011aa-55a9-43c6-a5f7-3b05bc89dcdd" />
+A dependency-free local dashboard that reads Cookie Clicker's Steam save and
+tracks Bank Stock Market prices over time.
 
+Use observed highs and lows to make better buy and sell decisions, or monitor
+the market while Cookie Clicker runs in the background.
 
-## Why use it?
+<p align="center">
+  <img width="100%" alt="Cookie Clicker Stock Market price table" src="https://github.com/user-attachments/assets/647b7b5d-b654-4f40-bab3-a99ab3ad86ac" />
+</p>
+<p align="center">
+  <img width="100%" alt="Cookie Clicker Stock Market price history chart" src="https://github.com/user-attachments/assets/db7011aa-55a9-43c6-a5f7-3b05bc89dcdd" />
+</p>
 
-The Stock Market only shows its current price in-game. This monitor records
-historical prices so you can compare the current value with the lows and highs
-you have observed, helping you decide when to buy or sell. It also keeps the
-timeline updated while Cookie Clicker runs in the background, so you can check
-market movement without bringing the game to the foreground.
+## Features
 
-## Safety and limits
+- Reads Steam `save.txt` files without modifying them.
+- Records price history in a local SQLite database.
+- Imports from a saved file path or manual upload.
+- Automatically refreshes the save path every minute.
+- Shows current prices, inventory, market mode, and observed highs and lows.
+- Highlights goods below a configurable price threshold.
+- Stores optional purchase-cost notes and highlights profitable prices.
+- Compares multiple goods on an interactive price-history chart.
+- Remembers dashboard preferences in browser local storage.
+- Uses only the Python standard library—no packages to install.
 
-- The Steam save is only read; the script never writes to Steam's `userdata`
-  folder.
-- Run the watcher on the Windows PC where Cookie Clicker is running. The game
-  must be open for Stock Market prices to advance.
-- A new record is stored only when the copied save's contents differ. Cookie
-  Clicker autosaves periodically, so use a polling interval slightly longer
-  than its autosave interval.
+## Requirements
 
-## Visual dashboard
+- Python 3.9 or newer
+- Cookie Clicker on Steam
+- The Bank's Stock Market minigame unlocked
 
-Start the local dashboard:
+## Quick start
 
-    python cookie_clicker_market_web.py
+Clone the repository and start the dashboard:
 
-Then open <http://127.0.0.1:8765>. It provides two import options:
+```sh
+git clone https://github.com/joaocjesus/cookie-clicker-stock-tracker.git
+cd cookie-clicker-stock-tracker
+python3 cookie_clicker_market_web.py
+```
 
-- **Read saved location** reads the complete Windows Steam `save.txt` path.
-  The path is kept only in that browser's local storage, so it is filled in
-  next time the dashboard opens.
-- **Upload save.txt** adds a manually copied save. This works even when the
-  game runs on another PC.
+Open <http://127.0.0.1:8765>, then either:
 
-The optional automatic refresh re-reads the saved source path once per minute.
-The dashboard is bound to `127.0.0.1`, so no other device can connect to it.
-It charts the selected good across imported snapshots, and the table lets you
-switch between all 18 goods.
+1. Enter the complete path to the Steam `save.txt` and select **Read saved
+   location**; or
+2. Select **Upload save.txt** to import a manually copied save.
 
-## Verify the parser
+Enable automatic refresh to re-read the saved path once per minute.
 
-The test suite creates its own synthetic save and does not need a real game
-save:
+## Finding the Steam save
 
-    python -m unittest discover -s tests -v
+The usual Windows location is:
 
-## Read the live Windows Steam save
+```text
+C:\Program Files (x86)\Steam\userdata\<SteamID>\1454400\remote\save.txt
+```
 
-The usual source location is:
+If Steam is installed elsewhere, use that installation's `userdata` directory.
+When the game runs on another computer, share or copy the file so it is
+accessible from the computer running this dashboard.
 
-    C:\Program Files (x86)\Steam\userdata\<SteamID>\1454400\remote\save.txt
+## Command-line usage
 
-If Steam was installed elsewhere, use that Steam installation's `userdata`
-directory instead. Start the watcher with the complete path to the file:
+Import one save:
 
-    python cookie_clicker_market.py watch --source "C:\Program Files (x86)\Steam\userdata\<SteamID>\1454400\remote\save.txt" --interval 60
+```sh
+python3 cookie_clicker_market.py snapshot --source /path/to/save.txt
+```
 
-Press `Ctrl+C` to stop it. The default output files are placed beside the
-script:
+Continuously watch a save:
 
-- `market.sqlite3` is the locally generated history database. It is created
-  automatically on the first import.
+```sh
+python3 cookie_clicker_market.py watch --source /path/to/save.txt --interval 60
+```
 
-## Export the timeline
+Export the timeline to CSV:
 
-Create a spreadsheet-friendly CSV from every saved snapshot:
+```sh
+python3 cookie_clicker_market.py export --output market_prices.csv
+```
 
-    python cookie_clicker_market.py export --output market_prices.csv
+Write the current prices to JSON:
 
-Each row contains the local capture time, commodity, current price, owned
-stock, mode, and price movement value from Cookie Clicker's save.
+```sh
+python3 cookie_clicker_market.py snapshot \
+  --source /path/to/save.txt \
+  --json-output current_market.json
+```
 
-## Optional JSON output
+Run `python3 cookie_clicker_market.py <command> --help` for all options.
 
-For a single current-price JSON file, use:
+## Data and privacy
 
-    python cookie_clicker_market.py snapshot --json-output current_market.json
+- The source save is read-only; the tool never writes to Steam's `userdata`
+  directory.
+- Price history is stored locally in `market.sqlite3`, which is created on the
+  first import and local.
+- Source paths, purchase-cost notes, chart selections, and display preferences
+  are stored in the browser's local storage.
+- The dashboard binds to `127.0.0.1` by default, so other devices cannot access
+  it.
+- A snapshot is added only when the save contents change.
 
-The parser is based on the current save fixture. If a future Cookie Clicker
-update changes the save layout, the tool stops with a format error instead of
-silently recording incorrect prices.
+The save contains the current market state, not historical prices. Observed
+highs and lows therefore cover only snapshots collected by this tool.
+
+## Development
+
+Run the dependency-free test suite:
+
+```sh
+python3 -m unittest discover -s tests -v
+```
+
+The parser fails with a format error rather than silently recording incorrect
+data if a future Cookie Clicker update changes the save layout.
+
+Contributions and bug reports are welcome. Please open an issue before making a
+large behavioral change.
+
+## Disclaimer
+
+Cookie Clicker is created by Orteil and Opti. This project is unofficial and is
+not affiliated with or endorsed by the game's creators.
 
 ## License
 
-Released under the [GNU General Public License v3.0](LICENSE). You may use,
-modify, and redistribute this software, including commercially, provided that
-distributed modified versions remain GPL-licensed and retain the copyright and
-license notices.
+Copyright © 2026 Joao Jesus.
+
+Licensed under the [GNU General Public License v3.0](LICENSE). You may use,
+modify, and redistribute this software, including commercially. Distributed
+versions must remain GPL-licensed and retain the copyright and license notices.
